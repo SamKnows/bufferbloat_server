@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -72,21 +74,30 @@ func main() {
 	mux.HandleFunc("/large", largeHandler)
 	mux.HandleFunc("/slurp", slurpHandler)
 
-	if *debug {
-		go func() {
-			log.Println(http.ListenAndServe("127.0.0.1:9090", nil))
-		}()
-	}
+	// 	if *debug {
+	// 		go func() {
+	// 			log.Println(http.ListenAndServe("127.0.0.1:9090", nil))
+	// 		}()
+	// 	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	listenAddr := fmt.Sprintf("%s:%d", *listenAddr, *basePort)
 	go func(listenAddr string) {
-		log.Printf("Network Quality URL: https://%s:%d/config", *domainName, *basePort)
-		if err := http.ListenAndServeTLS(listenAddr, *certFilename, *keyFilename, mux); err != nil {
-			log.Fatal(err)
+		// 		log.Printf("Network Quality URL: https://%s:%d/config", *domainName, *basePort)
+		// 		if err := http.ListenAndServe(listenAddr, mux); err != nil {
+		// 			log.Fatal(err)
+		// 		}
+
+		h2s := &http2.Server{}
+
+		server := &http.Server{
+			Addr:    listenAddr,
+			Handler: h2c.NewHandler(mux, h2s),
 		}
+		server.ListenAndServe()
+
 		wg.Done()
 	}(listenAddr)
 
